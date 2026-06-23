@@ -39,7 +39,7 @@ function App() {
       formData.append("file", selectedFile);
 
       const res = await axios.post(
-        "http://127.0.0.1:8000/analyze",
+        "https://valo-ai-coach.onrender.com/analyze",
         formData,
         {
           headers: {
@@ -63,7 +63,7 @@ function App() {
   const loadHistory = async () => {
     try {
       const res = await axios.get(
-        "http://127.0.0.1:8000/history"
+        "https://valo-ai-coach.onrender.com/history"
       );
 
       setHistory(res.data);
@@ -74,7 +74,7 @@ function App() {
 
   const downloadReport = () => {
     window.open(
-      "http://127.0.0.1:8000/download-report",
+      "https://valo-ai-coach.onrender.com/download-report",
       "_blank"
     );
   };
