@@ -1,15 +1,12 @@
-import easyocr
 import json
 import os
 import shutil
+import requests
 from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-
-import pytesseract
-from PIL import Image
 
 from dotenv import load_dotenv
 from groq import Groq
@@ -29,7 +26,6 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-reader = easyocr.Reader(['en'])
 app = FastAPI()
 
 app.add_middleware(
@@ -59,12 +55,36 @@ async def analyze(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # OCR
-        result = reader.readtext(file_path)
+        ocr_api_key = os.getenv("OCR_SPACE_API_KEY")
 
-        extracted_text = " ".join(
-        [item[1] for item in result]
-        )
+        with open(file_path, "rb") as image_file:
+
+         ocr_response = requests.post(
+        "https://api.ocr.space/parse/image",
+        files={
+            "file": image_file
+        },
+        data={
+            "language": "eng",
+            "OCREngine": 2
+        },
+        headers={
+            "apikey": ocr_api_key
+        }
+         )
+
+        ocr_result = ocr_response.json()
+
+        if (
+    "ParsedResults" in ocr_result
+    and len(ocr_result["ParsedResults"]) > 0
+):
+          extracted_text = ocr_result["ParsedResults"][0]["ParsedText"]
+
+        else:
+         extracted_text = ""
+
+
         # Prompt
         prompt = f"""
 You are ValorAI Coach, an elite Valorant analyst and coach.
