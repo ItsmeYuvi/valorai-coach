@@ -167,5 +167,14 @@
       "agent_advice": "Focus on using abilities to gain a strategic advantage, and practice last-second ability usage to catch enemies off guard. Additionally, work on improving map awareness to make more informed decisions during rounds.",
       "confidence": "Medium"
     }
+  },
+  {
+    "date": "2026-06-23 16:22:23.301299",
+    "filename": "Screenshot 2026-06-23 122847.png",
+    "ocr_text": "",
+    "analysis": {
+      "error": "Failed to parse AI response",
+      "raw_response": "```\n{\n  \"is_valorant\": false,\n  \"reason\": \"Not a Valorant screenshot\"\n}\n```"
+    }
   }
 ]

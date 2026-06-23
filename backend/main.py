@@ -55,35 +55,48 @@ async def analyze(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # OCR.Space
         ocr_api_key = os.getenv("OCR_SPACE_API_KEY")
 
         with open(file_path, "rb") as image_file:
 
-         ocr_response = requests.post(
-        "https://api.ocr.space/parse/image",
-        files={
-            "file": image_file
-        },
-        data={
-            "language": "eng",
-            "OCREngine": 2
-        },
-        headers={
-            "apikey": ocr_api_key
-        }
-         )
+            ocr_response = requests.post(
+                "https://api.ocr.space/parse/image",
+                files={
+                    "file": image_file
+                },
+                data={
+                    "language": "eng",
+                    "OCREngine": 2
+                },
+                headers={
+                    "apikey": ocr_api_key
+                }
+            )
 
         ocr_result = ocr_response.json()
 
         if (
-    "ParsedResults" in ocr_result
-    and len(ocr_result["ParsedResults"]) > 0
-):
-          extracted_text = ocr_result["ParsedResults"][0]["ParsedText"]
+            "ParsedResults" in ocr_result
+            and len(ocr_result["ParsedResults"]) > 0
+        ):
+            extracted_text = ocr_result["ParsedResults"][0]["ParsedText"]
 
         else:
-         extracted_text = ""
+            extracted_text = ""
 
+        print("========== OCR TEXT ==========")
+        print(extracted_text)
+        print("==============================")
+
+        if not extracted_text.strip():
+
+            return {
+                "ocr_text": "",
+                "analysis": {
+                    "error": "No text detected in screenshot"
+                }
+            }
 
         # Prompt
         prompt = f"""
@@ -92,37 +105,16 @@ You are ValorAI Coach, an elite Valorant analyst and coach.
 OCR Extracted Text:
 {extracted_text}
 
-TASK 1:
 Determine whether this screenshot is related to Valorant.
 
-Valid Valorant screenshots may contain:
-- Match scoreboards
-- Kills / Deaths / Assists (KDA)
-- ACS (Average Combat Score)
-- Headshot %
-- Match results
-- Agent names
-- Combat reports
-- Career history
-- Tracker statistics
-- Tournament broadcasts
-- Professional match overlays
-- RR gain/loss
-
-If the screenshot is NOT related to Valorant, return ONLY:
+If NOT related return ONLY:
 
 {{
   "is_valorant": false,
   "reason": "Not a Valorant screenshot"
 }}
 
---------------------------------------------------
-
-TASK 2:
-
-If it IS a Valorant screenshot, analyze ONLY the information visible in the OCR text.
-
-Return ONLY valid JSON in this exact format:
+If related return ONLY valid JSON:
 
 {{
   "is_valorant": true,
@@ -138,160 +130,18 @@ Return ONLY valid JSON in this exact format:
   "confidence": ""
 }}
 
---------------------------------------------------
-
-SCORING RULES
-
-Performance score:
-1-3 = Poor
-4-5 = Below Average
-6-7 = Average
-8-9 = Strong
-10 = Exceptional
-
-Confidence:
-High
-Medium
-Low
-
-Possible match types:
-- Competitive
-- Unrated
-- Swiftplay
-- Deathmatch
-- Premier
-- Professional Match
-- Tournament Match
-
---------------------------------------------------
-
-COACHING RULES
-
-You are a professional Valorant coach.
-
-Never leave any field empty.
-
-Never return:
-- None
-- Unknown
-- N/A
-- Not detected
-- No data
-
-If information is limited:
-- Infer likely strengths and weaknesses from available evidence.
-- Mention uncertainty through a lower confidence score.
-- Still provide useful coaching advice.
-
-Do NOT invent statistics that are not visible.
-
-However, you SHOULD provide evidence-based coaching observations.
-
---------------------------------------------------
-
-STRENGTHS RULES
-
-strengths must contain EXACTLY 3 meaningful observations.
-
-Bad examples:
-- Good player
-- Nice performance
-- Strong gameplay
-
-Good examples:
-- Positive KDA compared to teammates
-- Consistent participation in rounds
-- Strong impact during decisive rounds
-
---------------------------------------------------
-
-WEAKNESSES RULES
-
-weaknesses must contain EXACTLY 3 meaningful observations.
-
-Never use:
-- None detected
-- No weaknesses
-- Unknown
-
-If data is limited, identify:
-- Missing information
-- Potential performance risks
-- Areas requiring further review
-
-Example:
-[
-  "Opening duel success rate cannot be verified.",
-  "Utility efficiency is not visible from the screenshot.",
-  "Headshot consistency cannot be evaluated from available data."
-]
-
---------------------------------------------------
-
-IMPROVEMENT PLAN RULES
-
-improvement_plan must contain EXACTLY 3 actionable recommendations.
-
-Bad examples:
-- Play more
-- Practice aim
-- Get better
-
-Good examples:
-- Spend 15 minutes daily practicing crosshair placement.
-- Review deaths occurring within the first 20 seconds of rounds.
-- Focus on maintaining head-level crosshair positioning while clearing angles.
-
---------------------------------------------------
-
-FOCUS AREA RULES
-
-focus_area must ALWAYS contain exactly ONE primary improvement area.
-
-Choose ONLY one:
-
-- Aim
-- Crosshair Placement
-- Positioning
-- Utility Usage
-- Game Sense
-- Communication
-- Economy Management
-
-Never leave focus_area empty.
-
---------------------------------------------------
-
-AGENT RULES
-
-If an agent can be identified, provide agent-specific coaching.
-
-If an agent cannot be identified, provide general Valorant coaching advice.
-
-Never leave agent_advice empty.
-
---------------------------------------------------
-
-SUMMARY RULES
-
-summary must be 2-3 sentences.
-
-The summary should explain:
-- Overall performance
-- Key strengths
-- Main area for improvement
-
---------------------------------------------------
-
-OUTPUT RULES
-
-Return ONLY valid JSON.
-Do not use markdown.
-Do not use code blocks.
-Do not include explanations outside the JSON.
+Rules:
+- Never leave fields empty
+- Never use Unknown, N/A, None detected
+- Use only visible OCR evidence
+- strengths must contain 3 items
+- weaknesses must contain 3 items
+- improvement_plan must contain 3 items
+- score between 1 and 10
+- confidence must be High, Medium, or Low
+- Return ONLY JSON
 """
 
-        # AI Analysis
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -306,13 +156,36 @@ Do not include explanations outside the JSON.
 
         raw_analysis = response.choices[0].message.content
 
-        # Parse JSON
+        # Parse JSON safely
         try:
-            analysis = json.loads(raw_analysis)
-        except Exception:
+
+            cleaned_response = raw_analysis.strip()
+
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response.replace(
+                    "```json",
+                    ""
+                )
+
+            if cleaned_response.startswith("```"):
+                cleaned_response = cleaned_response.replace(
+                    "```",
+                    ""
+                )
+
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+
+            cleaned_response = cleaned_response.strip()
+
+            analysis = json.loads(cleaned_response)
+
+        except Exception as e:
+
             analysis = {
                 "error": "Failed to parse AI response",
-                "raw_response": raw_analysis
+                "raw_response": raw_analysis,
+                "parse_error": str(e)
             }
 
         # Save latest report
