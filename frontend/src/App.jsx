@@ -3,37 +3,43 @@ import axios from "axios";
 
 function App() {
   const [image, setImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
+  const file = e.target.files[0];
 
-    if (file) {
-      setImage(URL.createObjectURL(file));
-    }
-  };
+  if (file) {
+    setSelectedFile(file);
+    setImage(URL.createObjectURL(file));
+  }
+};
 
   const handleAnalyze = async () => {
+  if (!selectedFile) return;
+
   try {
     setLoading(true);
 
-    const res = await axios.get(
-      "http://127.0.0.1:8000/analyze"
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const res = await axios.post(
+      "http://127.0.0.1:8000/analyze",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
     );
 
-    console.log("API Response:", res);
-    console.log("Data:", res.data);
+    setResponse(res.data.ocr_text);
 
-    setResponse(res.data.message);
   } catch (error) {
-    console.error("ERROR:", error);
-
-    if (error.response) {
-      console.log(error.response);
-    }
-
-    setResponse("Failed to connect to backend");
+    console.error(error);
+    setResponse("OCR failed");
   } finally {
     setLoading(false);
   }
@@ -104,7 +110,15 @@ function App() {
 
               {response && (
                 <div className="mt-6 bg-zinc-900 border border-zinc-700 rounded-xl p-4">
-                  <p>{response}</p>
+                  <div className="text-left whitespace-pre-wrap">
+  <h3 className="text-xl font-bold mb-3">
+    📄 OCR Results
+  </h3>
+
+  <p className="text-zinc-300">
+    {response}
+  </p>
+</div>
                 </div>
               )}
             </div>
