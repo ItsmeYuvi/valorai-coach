@@ -1,3 +1,4 @@
+import easyocr
 import json
 import os
 import shutil
@@ -28,6 +29,7 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
+reader = easyocr.Reader(['en'])
 app = FastAPI()
 
 app.add_middleware(
@@ -36,10 +38,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-pytesseract.pytesseract.tesseract_cmd = (
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 )
 
 last_report = {}
@@ -62,9 +60,11 @@ async def analyze(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
 
         # OCR
-        image = Image.open(file_path)
-        extracted_text = pytesseract.image_to_string(image)
+        result = reader.readtext(file_path)
 
+        extracted_text = " ".join(
+        [item[1] for item in result]
+        )
         # Prompt
         prompt = f"""
 You are ValorAI Coach, an elite Valorant analyst and coach.
